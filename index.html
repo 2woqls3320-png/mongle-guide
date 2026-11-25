@@ -1,0 +1,905 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>몽글이 판단 지도</title>
+<meta name="description" content="AI 여행 가이드 몽글이의 판단 과정을 보여 주는 시연 페이지">
+<meta property="og:type" content="website">
+<meta property="og:title" content="몽글이 판단 지도">
+<meta property="og:description" content="AI 여행 가이드 몽글이의 판단 과정을 보여 주는 시연 페이지">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=IBM+Plex+Sans+KR:wght@400;500;600&family=Jua&display=swap">
+<style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style>
+<style>
+/* Layout: soft stacked sections; the map pairs a route diagram (자료 → 판단 → 결과) with a sticky evidence panel on wide screens. */
+:root{
+  --bg:#F3F4FA; --paper:#FFFFFF; --paper-2:#ECEEF7; --ink:#23253D; --ink-2:#5C6182; --rule:#D9DCEB; --wire:#C3C7DE;
+  --accent:#DD4F88; --accent-ink:#B42F68; --accent-wash:#FBE5EE; --on-accent:#FFFFFF;
+  --ok:#157A5E; --ok-wash:#DCF2EA; --est:#94600A; --est-wash:#FAEFD6; --unk:#6E7391; --unk-wash:#E9EBF4; --hold:#B04C17; --hold-wash:#FBE6DA;
+  --shadow:0 1px 2px rgba(35,37,61,.06), 0 8px 22px rgba(35,37,61,.07);
+  --f-display:'Jua','Apple SD Gothic Neo','Malgun Gothic','Noto Sans KR',sans-serif;
+  --f-body:'Gowun Dodum','Apple SD Gothic Neo','Malgun Gothic','Noto Sans KR',sans-serif;
+  --f-data:'IBM Plex Sans KR','Apple SD Gothic Neo','Malgun Gothic','Noto Sans KR',sans-serif;
+  --r-lg:22px; --r-md:16px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#14162A; --paper:#1C1F36; --paper-2:#252944; --ink:#ECEDF8; --ink-2:#A3A8C7; --rule:#33385A; --wire:#4A5079;
+    --accent:#FF79AC; --accent-ink:#FF9CC3; --accent-wash:#3B2238; --on-accent:#1C1F36;
+    --ok:#52D0A6; --ok-wash:#163A31; --est:#F0B653; --est-wash:#3A2F18; --unk:#A7ABC6; --unk-wash:#282C47; --hold:#FF9864; --hold-wash:#3E251B;
+    --shadow:0 1px 2px rgba(0,0,0,.35), 0 10px 26px rgba(0,0,0,.28);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#14162A; --paper:#1C1F36; --paper-2:#252944; --ink:#ECEDF8; --ink-2:#A3A8C7; --rule:#33385A; --wire:#4A5079;
+  --accent:#FF79AC; --accent-ink:#FF9CC3; --accent-wash:#3B2238; --on-accent:#1C1F36;
+  --ok:#52D0A6; --ok-wash:#163A31; --est:#F0B653; --est-wash:#3A2F18; --unk:#A7ABC6; --unk-wash:#282C47; --hold:#FF9864; --hold-wash:#3E251B;
+  --shadow:0 1px 2px rgba(0,0,0,.35), 0 10px 26px rgba(0,0,0,.28);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg); color:var(--ink); font-family:var(--f-body); font-size:15px; line-height:1.65; -webkit-font-smoothing:antialiased}
+.wrap{max-width:1240px; margin:0 auto; padding-left:max(16px, env(safe-area-inset-left, 0px)); padding-right:max(16px, env(safe-area-inset-right, 0px)); padding-block:28px 56px; display:flex; flex-direction:column; gap:52px}
+h1,h2,h3,h4{margin:0; font-weight:400; line-height:1.25; text-wrap:balance}
+h1,h2,h3{font-family:var(--f-display)}
+h2{font-size:clamp(23px, 2.6vw, 30px)}
+p{margin:0}
+button{font:inherit; color:inherit}
+.eyebrow{font-family:var(--f-data); font-size:12px; font-weight:600; letter-spacing:.06em; color:var(--ink-2)}
+.num{font-family:var(--f-data); font-variant-numeric:tabular-nums}
+.sr{position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap}
+:focus-visible{outline:2.5px solid var(--accent); outline-offset:3px}
+.sec-head{display:flex; flex-direction:column; gap:6px; margin-bottom:18px}
+.sec-head > p:not(.eyebrow){color:var(--ink-2); max-width:72ch}
+
+/* hero */
+.hero{display:grid; gap:18px 32px; grid-template-columns:minmax(0,1fr); align-items:center}
+.hero-id{display:flex; gap:18px; align-items:center; min-width:0}
+.hero h1{font-size:clamp(46px, 7vw, 68px); line-height:1}
+.role{margin-top:8px; font-size:16.5px; color:var(--ink-2); max-width:38ch}
+.demo-pill{display:inline-block; margin-bottom:10px; font-family:var(--f-data); font-size:12px; font-weight:600; color:var(--hold); background:var(--hold-wash); border-radius:999px; padding:3px 11px}
+.bubble{background:var(--paper); border:1px solid var(--rule); border-radius:20px 20px 20px 6px; padding:14px 17px; box-shadow:var(--shadow); min-width:0}
+.hero > .bubble{font-size:15.5px; max-width:60ch}
+.demo-note{grid-column:1/-1; font-size:13.5px; color:var(--ink-2); border:1px dashed var(--wire); border-radius:14px; padding:10px 14px}
+@media (min-width:900px){ .hero{grid-template-columns:minmax(0,1fr) minmax(0,1fr)} }
+
+/* mascot */
+.mongle{position:relative; display:block; flex:none; width:76px; aspect-ratio:76/68; background:var(--accent-wash); border:2px solid var(--accent); border-radius:50% 50% 46% 46% / 58% 58% 42% 42%; animation:bob 3.4s ease-in-out infinite}
+.mongle.sm{width:38px; border-width:1.5px; animation:none}
+.mongle i{position:absolute; display:block}
+.mongle .eye{top:40%; width:9%; height:13%; background:var(--ink); border-radius:50%}
+.mongle .eye.l{left:30%} .mongle .eye.r{right:30%}
+.mongle .blush{top:57%; width:15%; height:9%; background:var(--accent); opacity:.42; border-radius:50%}
+.mongle .blush.l{left:13%} .mongle .blush.r{right:13%}
+.mongle .mouth{top:55%; left:50%; width:16%; height:9%; transform:translateX(-50%); border:2px solid var(--ink); border-top:0; border-radius:0 0 999px 999px}
+.mongle.sm .mouth{border-width:1.5px}
+@keyframes bob{50%{transform:translateY(-4px)}}
+
+/* task: two asks side by side, then 기존 기능 vs 새로 맡긴 결정 */
+.quotes,.compare{display:grid; gap:14px; grid-template-columns:minmax(0,1fr)}
+.compare{margin-top:16px}
+.task-quote{margin:0; background:var(--paper); border:1px solid var(--rule); border-radius:var(--r-lg); padding:18px 20px; display:flex; flex-direction:column; gap:10px; min-width:0}
+.task-quote.new{border-color:var(--accent); background:var(--accent-wash)}
+.task-quote blockquote{margin:0; font-family:var(--f-display); font-size:18.5px; line-height:1.6}
+.ccol{display:flex; flex-direction:column; gap:10px; min-width:0}
+.ccol h3{font-size:19px}
+.decisions{list-style:none; margin:0; padding:0; display:grid; gap:10px; grid-template-columns:minmax(0,1fr)}
+.decisions li{background:var(--paper); border:1px solid var(--rule); border-radius:var(--r-md); padding:13px 16px; display:grid; gap:5px; align-content:start; min-width:0}
+.decisions li.mine{border-style:dashed; border-color:var(--wire)}
+.decisions .q{display:flex; justify-content:space-between; align-items:center; gap:8px; font-family:var(--f-data); font-size:12px; font-weight:600; color:var(--ink-2)}
+.decisions .pick{flex:none; font-family:var(--f-data); font-size:12px; font-weight:600; background:var(--accent-wash); color:var(--accent-ink); border-radius:999px; padding:0 9px}
+.decisions li.mine .pick{background:var(--paper-2); color:var(--ink-2)}
+.decisions p{font-size:14px}
+@media (min-width:760px){ .quotes,.compare{grid-template-columns:repeat(2,minmax(0,1fr))} }
+
+/* principles */
+.p-group{display:grid; gap:10px}
+.p-group + .p-group{margin-top:20px}
+.p-label{font-family:var(--f-data); font-size:13px; font-weight:600; color:var(--ink-2); letter-spacing:.04em}
+.p-grid{display:grid; gap:10px; grid-template-columns:minmax(0,1fr)}
+.pcard{display:grid; grid-template-columns:auto minmax(0,1fr); gap:3px 11px; align-content:start; text-align:left; background:var(--paper); border:1px solid var(--rule); border-radius:var(--r-md); padding:12px 14px; cursor:pointer; transition:border-color .25s, background-color .25s}
+.pcard .pn{grid-row:span 2; width:28px; height:28px; border-radius:50%; display:grid; place-items:center; background:var(--paper-2); font-family:var(--f-data); font-size:12px; font-weight:600; color:var(--ink-2)}
+.pcard .pt{font-family:var(--f-display); font-size:16.5px; line-height:1.3}
+.pcard .pr{font-size:13px; line-height:1.5; color:var(--ink-2)}
+.pcard:hover{border-color:var(--accent)}
+.pcard[aria-pressed="true"]{background:var(--accent-wash); border-color:var(--accent)}
+.pcard[aria-pressed="true"] .pn{background:var(--accent-ink); color:var(--on-accent)}
+.tag{display:inline-block; white-space:nowrap; vertical-align:2px; margin-left:6px; font-family:var(--f-data); font-size:11px; font-weight:600; line-height:1.6; padding:0 7px; border-radius:999px; background:var(--paper-2); color:var(--ink-2)}
+.tag.new{background:var(--accent-wash); color:var(--accent-ink)}
+.tag.adj{background:var(--est-wash); color:var(--est)}
+.pcard[aria-pressed="true"] .tag{background:var(--paper)}
+@media (min-width:560px){ .p-grid.core{grid-template-columns:repeat(3,minmax(0,1fr))} .p-grid.edge,.p-grid.time{grid-template-columns:repeat(2,minmax(0,1fr))} }
+@media (min-width:900px){ .p-grid.edge,.p-grid.time{grid-template-columns:repeat(4,minmax(0,1fr))} }
+
+/* map */
+.map-grid{display:grid; gap:16px; grid-template-columns:minmax(0,1fr); grid-template-areas:"steps" "evidence" "diagram"; scroll-margin-top:16px}
+.steps-bar{grid-area:steps; display:flex; gap:10px; align-items:center; min-width:0}
+.steps{position:relative; display:flex; gap:6px; overflow-x:auto; padding:4px; margin:-4px; flex:1; min-width:0; scrollbar-width:thin}
+.step{flex:none; display:inline-flex; align-items:center; gap:7px; padding:6px 13px 6px 6px; border-radius:999px; border:1px solid var(--rule); background:var(--paper); cursor:pointer; font-size:14px; white-space:nowrap; transition:background-color .2s, border-color .2s}
+.step:hover{border-color:var(--accent)}
+.sn{flex:none; width:22px; height:22px; border-radius:50%; display:inline-grid; place-items:center; background:var(--paper-2); font-family:var(--f-data); font-size:12px; font-weight:600; color:var(--ink-2)}
+.step[aria-selected="true"]{background:var(--accent-wash); border-color:var(--accent)}
+.step[aria-selected="true"] .sn{background:var(--accent-ink); color:var(--on-accent)}
+.phase{flex:none; align-self:center; font-family:var(--f-data); font-size:11.5px; font-weight:600; color:var(--ink-2); padding:0 2px 0 8px}
+.phase:first-child{padding-left:2px}
+.clear{flex:none; border:1px dashed var(--wire); background:transparent; border-radius:999px; padding:6px 13px; cursor:pointer; color:var(--ink-2); font-size:13.5px}
+.clear:hover{border-color:var(--accent); color:var(--accent-ink)}
+.diagram-scroll{grid-area:diagram; overflow-x:auto; min-width:0; background:var(--paper-2); border-radius:var(--r-lg); padding:16px}
+.scroll-hint{display:none; font-size:12.5px; color:var(--ink-2); margin-bottom:8px}
+@media (max-width:820px){ .scroll-hint{display:block} }
+.diagram{position:relative; min-width:760px; display:grid; grid-template-columns:minmax(180px,1fr) minmax(220px,1.2fr) minmax(180px,1fr); grid-template-rows:auto repeat(8, minmax(62px, auto)) auto minmax(62px, auto); column-gap:52px; row-gap:10px}
+.col-h{font-family:var(--f-data); font-size:12px; font-weight:600; letter-spacing:.06em; color:var(--ink-2); padding:0 2px 2px}
+.phase-div{grid-column:1/-1; display:flex; align-items:center; gap:10px; font-family:var(--f-data); font-size:12px; font-weight:600; letter-spacing:.04em; color:var(--accent-ink); padding-top:8px}
+.phase-div::before,.phase-div::after{content:""; flex:1; border-top:1.5px dashed var(--wire)}
+.node .tag{margin-left:0; flex:none}
+.wires{position:absolute; left:0; top:0; overflow:visible; pointer-events:none; z-index:0}
+.wires path{fill:none; stroke:var(--wire); stroke-width:1.6; stroke-linecap:round; transition:stroke .3s, stroke-width .3s, opacity .3s}
+.wires path.minor{stroke-dasharray:3 6}
+.wires .dot{fill:var(--accent)}
+.wires .halo{fill:var(--accent); opacity:.22}
+.diagram.has-sel .wires path{opacity:.16}
+.diagram.has-sel .wires path.on{opacity:1; stroke:var(--accent); stroke-width:2.4}
+.node{position:relative; z-index:1; display:flex; flex-direction:column; justify-content:center; align-items:flex-start; gap:4px; min-width:0; text-align:left; background:var(--paper); border:1px solid var(--rule); border-radius:var(--r-md); padding:9px 12px; cursor:pointer; overflow:hidden; transition:opacity .35s, border-color .3s, box-shadow .3s}
+.node > *{position:relative; z-index:1}
+.node:hover{border-color:var(--accent)}
+.node .nt{font-family:var(--f-display); font-size:15px; line-height:1.3; display:flex; align-items:center; gap:7px}
+.node .ns{display:block; font-size:12.5px; line-height:1.45; color:var(--ink-2)}
+.node.data{padding-left:28px}
+.node.data::before{content:""; position:absolute; z-index:1; left:11px; top:14px; width:9px; height:9px; border-radius:50%; border:2px solid var(--wire); background:var(--paper-2)}
+.node.judge .sn{width:20px; height:20px; font-size:11px}
+.node.result{border-width:1.5px; justify-content:flex-start; padding:11px 13px}
+.node.result .nt{font-size:16px}
+.node.result .li{display:block; font-size:12.5px; line-height:1.5; color:var(--ink-2)}
+.node.result .li::before{content:"· "}
+.diagram.has-sel .node{opacity:.3}
+.diagram.has-sel .node.on{opacity:1; border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-wash)}
+.node.arrive{animation:arrive 1.1s ease-out}
+@keyframes arrive{0%{box-shadow:0 0 0 0 var(--accent)} 35%{box-shadow:0 0 0 6px var(--accent-wash)} 100%{box-shadow:0 0 0 0 var(--accent-wash)}}
+.node > .ripple{position:absolute; z-index:0; width:22px; height:22px; margin:-11px 0 0 -11px; border-radius:50%; background:radial-gradient(circle, var(--accent) 0 28%, var(--accent-wash) 52%, transparent 72%); pointer-events:none; animation:ripple 1.25s cubic-bezier(.2,.7,.3,1) forwards}
+@keyframes ripple{from{transform:scale(.3); opacity:.75} to{transform:scale(24); opacity:0}}
+.enter{animation:rise .7s cubic-bezier(.2,.8,.2,1) backwards; animation-delay:var(--d,0ms)}
+@keyframes rise{from{opacity:0; transform:translateY(16px) scale(.97)}}
+
+/* status chips */
+.chip{display:inline-flex; align-items:center; gap:5px; font-family:var(--f-data); font-size:11.5px; font-weight:500; line-height:1.6; padding:1px 9px; border-radius:999px; background:var(--paper-2); color:var(--ink-2); white-space:nowrap}
+.chip::before{content:""; width:6px; height:6px; border-radius:50%; background:currentColor; flex:none}
+.chip.ok{background:var(--ok-wash); color:var(--ok)}
+.chip.est{background:var(--est-wash); color:var(--est)}
+.chip.unk{background:var(--unk-wash); color:var(--unk)}
+.chip.hold{background:var(--hold-wash); color:var(--hold)}
+.chip.pick{background:var(--accent-wash); color:var(--accent-ink)}
+
+/* evidence */
+.evidence{grid-area:evidence; background:var(--paper); border:1px solid var(--rule); border-radius:var(--r-lg); padding:18px; display:flex; flex-direction:column; gap:14px; min-width:0; box-shadow:var(--shadow)}
+.ev-title{font-size:22px; margin-top:4px}
+.ev-why{font-size:14.5px}
+.ev-extra,.calc-line{font-size:13px; color:var(--ink-2); background:var(--paper-2); border-radius:12px; padding:8px 12px}
+.say{display:flex; gap:10px; align-items:flex-start}
+.say .bubble{box-shadow:none; background:var(--accent-wash); border-color:transparent; font-size:14px; padding:10px 13px}
+.ev-block h4{font-family:var(--f-data); font-size:12px; font-weight:600; letter-spacing:.05em; color:var(--ink-2); margin-bottom:7px}
+.ev-guide ul{list-style:none; margin:0; padding:0; display:flex; flex-wrap:wrap; gap:6px}
+.ev-guide li{font-family:var(--f-data); font-size:12.5px; background:var(--paper-2); border-radius:8px; padding:3px 9px}
+.convo{display:grid; gap:8px}
+.ccard{background:var(--bg); border:1px solid var(--rule); border-radius:14px; padding:10px 12px; display:grid; gap:5px; font-size:13.5px}
+.ccard.mine{border-style:dashed}
+.ccard .cw{font-family:var(--f-data); font-size:11.5px; font-weight:600; color:var(--ink-2)}
+.ccard .ca{display:flex; gap:8px; align-items:baseline}
+.ccard .ca b{flex:none; font-family:var(--f-data); font-weight:600; font-size:11.5px; background:var(--accent-ink); color:var(--on-accent); border-radius:999px; padding:0 8px}
+.hold-box{border:1.5px solid var(--hold); background:var(--hold-wash); border-radius:14px; padding:12px 14px; display:grid; gap:6px; font-size:13.5px}
+.hold-box strong{font-family:var(--f-display); font-weight:400; font-size:16px}
+dl.kv{margin:0; display:grid; gap:1px}
+dl.kv dt{font-family:var(--f-data); font-size:11.5px; font-weight:600; color:var(--ink-2)}
+dl.kv dd{margin:0 0 6px}
+.hold-box dl.kv dt{color:var(--hold)}
+.ev-lanes{display:flex; flex-wrap:wrap; gap:6px}
+.lane-link{border:1px solid var(--rule); background:var(--paper); border-radius:999px; padding:3px 11px; font-size:13px; cursor:pointer}
+.lane-link:hover{border-color:var(--accent); color:var(--accent-ink)}
+.lane-link.static{cursor:default; background:var(--paper-2); border-color:transparent}
+.ev-legend{display:flex; flex-wrap:wrap; gap:6px}
+.keys{font-size:13px; color:var(--ink-2); line-height:2.1}
+kbd{font-family:var(--f-data); font-size:11.5px; border:1px solid var(--rule); border-bottom-width:2px; border-radius:6px; padding:0 6px; background:var(--paper); color:var(--ink)}
+.checks{list-style:none; margin:0; padding:0; display:grid; gap:7px; font-size:13.5px}
+.checks li{display:flex; gap:9px; align-items:baseline}
+.checks .mk{flex:none; font-family:var(--f-data); font-weight:600; font-size:11.5px; color:var(--ok); background:var(--ok-wash); border-radius:6px; padding:0 6px}
+.checks li.part .mk{color:var(--est); background:var(--est-wash)}
+.chat-lines p + p{margin-top:7px}
+.toc{margin:0; padding-left:1.5em; display:grid; gap:2px; font-size:13.5px}
+.unfold{animation:unfold .45s cubic-bezier(.2,.8,.2,1) backwards; animation-delay:var(--d,0ms)}
+@keyframes unfold{from{opacity:0; transform:translateY(10px)}}
+@media (min-width:1100px){
+  .map-grid{grid-template-columns:minmax(0,1fr) 350px; grid-template-areas:"steps steps" "diagram evidence"; align-items:start}
+  .evidence{position:sticky; top:calc(env(safe-area-inset-top, 0px) + 14px); max-height:calc(100vh - 28px); overflow:auto}
+}
+
+/* charts */
+.charts{display:grid; gap:16px; grid-template-columns:minmax(0,1fr)}
+.chart{background:var(--paper); border:1px solid var(--rule); border-radius:var(--r-lg); padding:18px; display:flex; flex-direction:column; gap:12px; min-width:0}
+.chart h3{font-size:19px}
+.chart .rule{font-size:13.5px; color:var(--ink-2)}
+.bars{display:grid; gap:11px}
+.brow{display:grid; grid-template-columns:minmax(0,8.8em) minmax(0,1fr) minmax(0,7.6em); gap:10px; align-items:center}
+.blabel{font-size:13px; line-height:1.35}
+.track{position:relative; height:22px; background:var(--paper-2); border-radius:7px}
+.bar{position:absolute; left:0; top:0; bottom:0; width:var(--w); border-radius:7px; background:var(--wire); transform-origin:left center; animation:grow 1.05s cubic-bezier(.2,.8,.2,1) backwards; animation-delay:calc(var(--d,0ms) + 250ms)}
+.bar.pick{background:var(--accent)}
+.bar.unk{background:repeating-linear-gradient(135deg, var(--unk-wash) 0 5px, transparent 5px 10px); border:1.5px dashed var(--unk)}
+.bar.est{background:repeating-linear-gradient(135deg, var(--wire) 0 5px, var(--est-wash) 5px 10px)}
+.bar.over{background:repeating-linear-gradient(135deg, var(--hold-wash) 0 5px, transparent 5px 10px); border:1.5px dashed var(--hold)}
+@keyframes grow{from{transform:scaleX(0)}}
+.thr{position:absolute; top:-6px; bottom:-6px; left:var(--t); border-left:2px dashed var(--hold); z-index:2}
+.bval{font-family:var(--f-data); font-variant-numeric:tabular-nums; font-size:12.5px; text-align:right; line-height:1.3}
+.bval small{display:block; font-size:11px; color:var(--ink-2)}
+.bars.compact .brow{grid-template-columns:minmax(0,1fr) auto; grid-template-areas:"l v" "t t"; row-gap:4px}
+.bars.compact .blabel{grid-area:l} .bars.compact .track{grid-area:t} .bars.compact .bval{grid-area:v}
+.bars.compact .bval small{display:inline; margin-left:6px}
+.thr-key{display:flex; align-items:center; gap:8px; font-family:var(--f-data); font-size:12px; color:var(--hold)}
+.thr-key i{display:block; width:16px; border-top:2px dashed var(--hold)}
+.fine{font-size:12px; color:var(--ink-2)}
+@media (min-width:760px){ .charts{grid-template-columns:repeat(2,minmax(0,1fr))} .chart.wide{grid-column:1/-1} }
+@media (max-width:520px){
+  .bars .brow{grid-template-columns:minmax(0,1fr) auto; grid-template-areas:"l v" "t t"; row-gap:4px}
+  .bars .blabel{grid-area:l} .bars .track{grid-area:t} .bars .bval{grid-area:v}
+  .bars .bval small{display:inline; margin-left:6px}
+}
+
+/* holds, conclusion, footer */
+.holds{display:grid; gap:14px; grid-template-columns:minmax(0,1fr)}
+.hcard{background:var(--paper); border:1px solid var(--rule); border-radius:var(--r-lg); padding:18px; display:flex; flex-direction:column; align-items:flex-start; gap:10px; min-width:0}
+.hcard h3{font-size:18px}
+.hcard .lane-link{margin-top:auto}
+@media (min-width:760px){ .holds{grid-template-columns:repeat(2,minmax(0,1fr))} }
+.concl{display:grid; gap:18px; grid-template-columns:minmax(0,1fr)}
+.chat{display:flex; gap:14px; align-items:flex-start; min-width:0}
+.chat .bubble{font-size:15.5px; flex:1}
+.docmap{background:var(--paper); border:1px solid var(--rule); border-radius:var(--r-lg); padding:18px; display:flex; flex-direction:column; gap:10px; min-width:0}
+.docmap h3{font-size:18px}
+@media (min-width:900px){ .concl{grid-template-columns:minmax(0,1.7fr) minmax(0,1fr); align-items:start} }
+.onsite{grid-column:1/-1; background:var(--paper-2); border-radius:var(--r-lg); padding:18px; display:grid; gap:14px; min-width:0}
+.onsite h3{font-size:18px}
+.talks{display:grid; gap:18px; grid-template-columns:minmax(0,1fr)}
+@media (min-width:760px){ .talks{grid-template-columns:repeat(2,minmax(0,1fr))} }
+.ev-talks{display:grid; gap:14px}
+.talk{display:flex; flex-direction:column; gap:8px; min-width:0}
+.talk .when{font-family:var(--f-data); font-size:12px; font-weight:600; color:var(--ink-2)}
+.msg{display:flex; gap:9px; align-items:flex-start; min-width:0}
+.msg .bubble{box-shadow:none; font-size:14px; padding:10px 13px}
+.msg.user{justify-content:flex-end}
+.msg.user .bubble{background:var(--paper); border-radius:18px 18px 6px 18px; max-width:85%}
+.msg.guide .bubble{background:var(--accent-wash); border-color:transparent}
+.ev-talks .msg.user .bubble{background:var(--bg)}
+.msg .photo{display:inline-block; font-family:var(--f-data); font-size:11.5px; background:var(--paper-2); border-radius:6px; padding:0 6px; margin-right:6px; color:var(--ink-2)}
+.foot{font-size:13px; color:var(--ink-2); border-top:1px solid var(--rule); padding-top:18px; display:grid; gap:4px}
+@media (prefers-reduced-motion: reduce){
+  .enter,.unfold,.bar,.node.arrive,.mongle{animation:none !important}
+  .node > .ripple{display:none}
+  .wires path,.node{transition:none}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="hero">
+  <div class="hero-id">
+    <span class="mongle" aria-hidden="true"><i class="eye l"></i><i class="eye r"></i><i class="blush l"></i><i class="blush r"></i><i class="mouth"></i></span>
+    <div>
+      <p class="demo-pill">시연 예시 · 실제 조회 아님</p>
+      <h1>몽글이</h1>
+      <p class="role">여행 전엔 나만의 가이드북을 만들고, 여행 중엔 부를 때만 곁에 오는 AI 여행 가이드</p>
+    </div>
+  </div>
+  <p class="bubble">안녕하세요, 몽글이예요오. 그 동네 이야기랑 맛집은 제가 다 알려 드릴게요. 대신 졸졸 따라다니지 않아요! 시간이 정해진 일정만 하루 2개까지 잡고, 나머지는 마음대로 쓰시는 자유 시간이에요. 궁금할 때 부르시면 바로 답해 드릴게요.</p>
+  <p class="demo-note">아직 실제로 조회하거나 실행한 기록이 없어서, 지침대로 가상 입력을 넣고 판단한 과정을 시연 예시로 보여 드려요. 도시·축제·장소·가격·시간은 모두 지어낸 값이에요.</p>
+</header>
+
+<section aria-labelledby="task-h">
+  <div class="sec-head"><p class="eyebrow">맡긴 업무</p><h2 id="task-h">기존 기능과 새로 맡긴 결정</h2><p>여행 플래너로 만든 기능은 그대로 살리고, AI 여행 가이드로 바꾸며 새로 정한 결정을 나란히 놓았어요.</p></div>
+  <div class="quotes">
+    <figure class="task-quote">
+      <figcaption class="eyebrow">처음 맡긴 업무 · 대화 원문</figcaption>
+      <blockquote>여행을 갈때 그 지역의 축제같은 행사나 날씨 먹거리등을 다 고려한 최적의 여행 루트 그리고 비행기 값이나 숙소 저렴하게 갈수있는 것도 좋아</blockquote>
+    </figure>
+    <figure class="task-quote new">
+      <figcaption class="eyebrow">새로 맡긴 업무 · 대화 원문</figcaption>
+      <blockquote>내가 하고싶은건 여행을 좋아해도 그 장소에 대해 아는게 없어서 여행가이드를 섭외하거나 찾아보잖아 그치만 여행가이드를 섭외해서 여행할경우 같이 돌아다녀야하고 개인시간이 어려우니 그걸 보장한 AI 여행 가이드를 생각중이야</blockquote>
+    </figure>
+  </div>
+  <div class="compare">
+    <div class="ccol">
+      <h3>기존 기능 · 여행 플래너</h3>
+      <ol class="decisions">
+        <li><span class="q">인터뷰 1 · 업무 범위 <span class="pick">1번</span></span><p>지역과 날짜를 받아요. 날짜가 유동적이면 축제·날씨·항공권 가격으로 날짜부터 고르고, 항공·숙소 최저가 후보와 총예산까지 만들어요.</p></li>
+        <li><span class="q">인터뷰 2 · 우선 기준 <span class="pick">1번</span></span><p>축제·날씨·먹거리로 큰 틀을 잡고 비용은 그 안에서 줄여요. 1인 5만 원, 30분, 20%가 기준선이에요.</p></li>
+        <li><span class="q">인터뷰 3 · 확인 범위 <span class="pick">1번</span></span><p>빠진 조건은 처음에 한 번에 묻고, 중간 질문은 정해진 네 경우에만 해요. 예약과 결제는 하지 않아요.</p></li>
+        <li><span class="q">인터뷰 4 · 결과 형식 <span class="pick">1번</span></span><p>채팅에는 평문 결론만, 일정과 가격 비교는 표가 있는 문서로 드려요.</p></li>
+      </ol>
+    </div>
+    <div class="ccol">
+      <h3>새로 맡긴 결정 · AI 여행 가이드</h3>
+      <ol class="decisions">
+        <li><span class="q">새 인터뷰 1 · 가이드 시기 <span class="pick">1번</span></span><p>여행 전엔 나만의 가이드북을 만들고, 여행 중엔 부를 때만 그 자리에 맞게 답해요. 먼저 말을 걸거나 재촉하지 않아요.</p></li>
+        <li><span class="q">새 인터뷰 2 · 개인 시간 <span class="pick">1번</span></span><p>시간이 정해진 것만 고정 일정으로, 항공편을 빼고 하루 2개까지 넣어요. 나머지는 걸어서 15분 안쪽 카드만 붙인 자유 시간이고, 혼자 있을 시간엔 카드도 없어요.</p></li>
+        <li class="mine"><span class="q">기존 규칙 맞춤 · 몽글이가 정함 <span class="pick">기본값</span></span><p>비 오는 날엔 카드를 실내 위주로, 식당은 카드에만, 숙소 30분 기준은 고정 일정과 카드가 모인 동네로 바꿨어요.</p></li>
+        <li class="mine"><span class="q">현장 답변 · 몽글이가 정함 <span class="pick">기본값</span></span><p>현장 답은 3문장 안쪽, '더'라고 하시면 이어서 말해요. 위치는 확인받고, 출처 없는 이야기는 전해지는 이야기로, 위급하면 연락처부터 알려 드려요.</p></li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+<section aria-labelledby="soul-h">
+  <div class="sec-head"><p class="eyebrow">나의 SOUL.md</p><h2 id="soul-h">원칙을 고르면 판단 경로가 밝아져요</h2><p>원칙 카드나 단계 탭, 다이어그램 카드를 눌러 보세요. 키보드로는 Tab과 화살표, 숫자 1~9와 0, Esc(전체 보기)를 쓸 수 있어요. <span class="tag new">새로</span>는 AI 가이드로 바꾸며 더한 원칙이고, <span class="tag adj">고침</span>은 기존 원칙을 새 구조에 맞춘 거예요.</p></div>
+  <div class="p-group"><h3 class="p-label">개인 시간</h3><div class="p-grid time" id="p-time"></div></div>
+  <div class="p-group"><h3 class="p-label">핵심 원칙</h3><div class="p-grid core" id="p-core"></div></div>
+  <div class="p-group"><h3 class="p-label">말투와 경계</h3><div class="p-grid edge" id="p-edge"></div></div>
+</section>
+
+<section aria-labelledby="map-h">
+  <div class="sec-head"><p class="eyebrow">작업·판단 과정 · 시연 예시</p><h2 id="map-h">확인한 자료 → 판단 근거 → 결과</h2><p>가상 입력: ○○시(국내) · 내년 4월쯤 · 2박 3일 · 2명 · □□공항 출발 · 1인 예산 55만 원 · 금요일 밤은 혼자 있을 시간</p></div>
+  <div class="map-grid" id="mapGrid">
+    <div class="steps-bar">
+      <div class="steps" id="steps" role="tablist" aria-label="작업 단계"></div>
+      <button type="button" class="clear" id="clearSel">전체 보기</button>
+    </div>
+    <div class="diagram-scroll">
+      <p class="scroll-hint">옆으로 밀면 결과 칸까지 보여요.</p>
+      <div class="diagram" id="diagram" role="group" aria-label="확인한 자료에서 판단 근거를 거쳐 결과로 가는 경로">
+        <svg class="wires" id="wires" aria-hidden="true"></svg>
+      </div>
+    </div>
+    <aside class="evidence" id="evidence" aria-live="polite" aria-label="고른 항목의 근거"></aside>
+  </div>
+</section>
+
+<section aria-labelledby="num-h">
+  <div class="sec-head"><p class="eyebrow">숫자로 본 판단 · 시연 값</p><h2 id="num-h">기준선과 비교한 값</h2><p>막대는 모두 0에서 시작하는 같은 눈금이고, 점선은 지침의 기준선이에요.</p></div>
+  <div class="charts" id="charts"></div>
+</section>
+
+<section aria-labelledby="hold-h">
+  <div class="sec-head"><p class="eyebrow">보류와 확인 필요</p><h2 id="hold-h">확정하지 않은 판단과 필요한 자료</h2><p>확인하지 못한 정보는 추측으로 채우지 않고, 이유와 필요한 자료를 남겨 둬요.</p></div>
+  <div class="holds" id="holds"></div>
+</section>
+
+<section aria-labelledby="out-h">
+  <div class="sec-head"><p class="eyebrow">결과 · 시연 예시</p><h2 id="out-h">몽글이가 드리는 결과</h2></div>
+  <div class="concl">
+    <div class="chat">
+      <span class="mongle sm" aria-hidden="true"><i class="eye l"></i><i class="eye r"></i><i class="blush l"></i><i class="blush r"></i><i class="mouth"></i></span>
+      <div class="bubble chat-lines" id="chatLines"></div>
+    </div>
+    <aside class="docmap">
+      <p class="eyebrow">나만의 가이드북 목차</p>
+      <h3>자세한 내용은 가이드북으로</h3>
+      <ol class="toc" id="toc"></ol>
+      <p class="fine">시연이라 실제 문서는 만들지 않았어요. 실제 여행이 정해지면 일정표와 카드, 비교표를 채워 드려요.</p>
+    </aside>
+    <div class="onsite">
+      <div><p class="eyebrow">여행 중 · 부르실 때만</p><h3>현장 답변</h3></div>
+      <div class="talks" id="talks"></div>
+    </div>
+  </div>
+</section>
+
+<footer class="foot">
+  <p>이 페이지는 SOUL.md와 에이전트 지침을 시연한 예시예요. 실제 조회·예약을 하지 않았고, 도시·축제·장소·가격·시간은 모두 가상 값이에요.</p>
+  <p>2026년 11월 4일에 만들고, 11월 11일에 AI 여행 가이드로 고쳤어요.</p>
+</footer>
+</div>
+
+<script>
+const MONGLE = '<i class="eye l"></i><i class="eye r"></i><i class="blush l"></i><i class="blush r"></i><i class="mouth"></i>';
+
+const CONVO = {
+  task:{who:'처음 맡긴 업무 · 대화 원문', a:'여행을 갈때 그 지역의 축제같은 행사나 날씨 먹거리등을 다 고려한 최적의 여행 루트 그리고 비행기 값이나 숙소 저렴하게 갈수있는 것도 좋아'},
+  task2:{who:'새로 맡긴 업무 · 대화 원문', a:'여행가이드를 섭외해서 여행할경우 같이 돌아다녀야하고 개인시간이 어려우니 그걸 보장한 AI 여행 가이드를 생각중이야'},
+  q1:{who:'인터뷰 1 · 업무 범위', q:'에이전트가 어떤 여행 정보를 받아서 어디까지 만들어 주면 좋을까요?', a:'1', pick:'지역과 날짜를 받고, 날짜가 유동적이면 축제·날씨·항공권 가격이 가장 좋은 날부터 골라 동선, 항공·숙소 최저가 후보, 총예산까지 만들기'},
+  q2:{who:'인터뷰 2 · 우선 기준', q:'축제나 먹거리 같은 경험이랑 비용이 부딪힐 때 무엇을 먼저 고를까요?', a:'1', pick:'축제·날씨·먹거리로 큰 틀을 잡고 그 안에서 실제 총액이 가장 싼 것. 1인 5만 원 이내면 좋은 시간대 항공·30분 안 숙소, 20% 넘게 비싸면 두 안을 나란히'},
+  q3:{who:'인터뷰 3 · 확인 범위', q:'에이전트가 어디까지 혼자 처리하고, 언제 물어보면 좋을까요?', a:'1', pick:'빠진 조건은 처음에 한 번에 묻고 나머지는 끝까지 혼자. 예약·결제는 하지 않고 링크와 조회 시각만. 중간엔 예산 초과, 축제 미발표, 날짜 이동 이득일 때만 질문'},
+  q4:{who:'인터뷰 4 · 결과 형식', q:'여행 계획 결과를 어떤 모양으로 받아 볼까요?', a:'1', pick:'채팅엔 추천 날짜·1인 총비용·동선·확인 필요를 평문으로 짧게, 시간표와 비교는 표를 쓰는 문서로'},
+  g1:{who:'새 인터뷰 1 · 가이드 시기', q:'AI 가이드가 여행 전과 여행 중에 언제, 어떻게 도와드리면 좋을까요?', a:'1', pick:'여행 전엔 축제·날씨·먹거리, 항공·숙소 최저가와 장소 이야기를 담은 가이드북. 여행 중엔 물어보실 때만 그 자리에 맞게 답하고, 먼저 말을 걸거나 재촉하지 않기'},
+  g2:{who:'새 인터뷰 2 · 개인 시간', q:'혼자만의 시간을 일정에서 어떻게 지켜 드릴까요?', a:'1', pick:'시간이 정해진 것만 고정 일정(항공편 빼고 하루 2개까지), 나머지는 자유 시간. 걸어서 15분 안쪽 볼거리·먹거리·쉴 곳 카드만 붙이고, 혼자 있을 시간엔 카드도 넣지 않기'},
+  pref:{who:'평소 요청하신 답변 방식', pick:'예고 없이 결론부터, 짧은 평문, 동글동글 부드럽고 애교 있는 말투, 사실과 다른 내용이나 문제점은 숨기지 않기'},
+  mine:{who:'처음 문서를 쓰며 정한 기본값 · 따로 확인받지 않음', pick:'오전 7시 전 출발·밤 11시 넘은 도착은 나쁜 시간대, 숙소 5만 원은 숙박 전체 합계, 10일 안은 예보·그 뒤는 평년값, 식당은 최근 1년 안 출처', mine:true},
+  mine2:{who:'AI 가이드로 고치며 정한 기본값 · 따로 확인받지 않음', pick:'현장 답은 3문장 안쪽과 "더", 위치는 이름이나 사진으로 확인받기, 출처 없는 이야기는 전해지는 이야기로, 위급하면 연락처 먼저, 시작 질문에 혼자 있을 시간 한 줄, 숙소 30분은 고정 일정과 카드 동네 기준', mine:true}
+};
+
+const PRINCIPLES = [
+  {id:'p1', g:'time', tag:'new', t:'고정 일정은 하루 2개', r:'시간이 정해진 것만 고정하고, 항공편을 빼면 하루 2개까지 넣어요.', full:'시간이 정해진 것(항공편, 축제 핵심 행사, 시간 예약이 필요한 곳)만 고정 일정으로 둔다. 고정 일정은 항공편을 빼고 하루 2개까지다. 후보가 2개를 넘으면 축제 핵심 행사를 먼저 남기고, 나머지는 다른 날로 옮기거나 골라 쓰는 카드로 돌린다.', lanes:['fixed'], res:['doc'], guide:['2. 개인 시간 규칙 1 · 2','5. A-5 · 고정 일정 정하기','6. 여행 전 · 고정 일정 후보가 2개를 넘음'], convo:['task2','g2']},
+  {id:'p2', g:'time', tag:'new', t:'자유 시간엔 카드만', r:'순서 없이 걸어서 15분 안쪽 볼거리·먹거리·쉴 곳 2~3개만 붙여요.', full:'고정 일정 밖은 모두 자유 시간이다. 순서를 정하지 않고, 걸어서 15분 안쪽의 볼거리·먹거리·쉴 곳을 2~3개씩 골라 쓰는 카드로만 붙인다.', lanes:['fixed','cards'], res:['doc'], guide:['2. 개인 시간 규칙 3','5. A-6 · 자유 시간과 카드'], convo:['g2']},
+  {id:'p3', g:'time', tag:'new', t:'혼자 시간은 비워 둬요', r:'혼자 있겠다고 정한 시간엔 카드도 넣지 않아요.', full:'사용자가 혼자 있을 시간으로 정한 시간에는 카드도 넣지 않는다. 그 시간이 축제 핵심 행사와 겹치면 혼자 시간을 지키고, 놓치는 행사를 결론에서 한 줄로 알린다.', lanes:['input','fixed'], res:['doc'], guide:['2. 기준이 부딪힐 때','2. 개인 시간 규칙 4','6. 여행 전 · 혼자 시간과 축제가 겹침'], convo:['g2','mine2']},
+  {id:'p4', g:'time', tag:'new', t:'부를 때만 답해요', r:'먼저 말을 걸거나 재촉하지 않고, 알림도 부탁하실 때만 만들어요.', full:'여행 중에는 사용자가 부를 때만 지금 있는 곳에 맞게 답한다. 먼저 말을 걸거나 다음 일정을 재촉하지 않고, 날씨 알림이나 일정 알림도 사용자가 부탁할 때만 만든다.', lanes:['onsite'], res:['onsite'], guide:['2. 개인 시간 규칙 5','2. 하지 않는 일','5. B · 부를 때만 현장 안내'], convo:['task2','g1']},
+  {id:'p5', g:'core', tag:'', t:'큰 틀 먼저', r:'축제·날씨·먹거리로 큰 틀을 정하고, 비용은 그 안에서 줄여요.', full:'일정의 큰 틀은 축제·날씨·먹거리로 먼저 정하고, 비용은 그 틀 안에서 줄인다.', lanes:['festival','weather','date','cards'], res:[], guide:['2. 우선순위 1','5. A-4 · 날짜 정하기'], convo:['task','q2']},
+  {id:'p6', g:'core', tag:'adj', t:'축제는 확정만 고정', r:'공식 발표된 날짜·시간만 고정 일정에 넣고, 발표 전이면 먼저 물어요.', full:'공식 출처에서 발표된 축제 날짜·시간만 확정으로 고정 일정에 쓴다. 발표 전이면 사용자에게 물은 뒤에만 작년 일정을 예상으로 쓴다.', lanes:['festival','fixed'], res:[], guide:['2. 우선순위 2','2. 묻는 순간 2','6. 여행 전 · 축제 날짜 미발표'], convo:['q2','q3']},
+  {id:'p7', g:'core', tag:'', t:'실제 총액으로 비교', r:'세금·수하물·청소비까지 더하고, 확인 못 한 상품은 최저가로 확정하지 않아요.', full:'항공은 세금·수하물 요금, 숙소는 세금·청소비·서비스료까지 더한 실제 총액으로 비교한다. 이 비용을 확인하지 못한 상품은 최저가로 확정하지 않는다.', lanes:['air'], res:['check'], guide:['2. 우선순위 3','6. 여행 전 · 수하물·세금·청소비 미확인'], convo:['q2']},
+  {id:'p8', g:'core', tag:'', t:'항공 5만 원 규칙', r:'최저가보다 1인 5만 원 이내로 비싸면 시간대가 좋은 편을 골라요.', full:'왕복 항공 실제 총액이 최저가보다 1인 5만 원 이내로 비싸면 시간대가 좋은 편을 고른다. 오전 7시 전에 출발하거나 밤 11시 넘어 도착하는 편은 시간대가 나쁜 편으로 본다.', lanes:['air'], res:['link'], guide:['2. 우선순위 4','5. A-8 · 항공 비교'], convo:['q2','mine']},
+  {id:'p9', g:'core', tag:'adj', t:'숙소 5만 원 · 30분', r:'숙박 합계가 1인 5만 원 이내로 비싸면 고정 일정·카드 동네까지 30분 안쪽 숙소를 골라요.', full:'숙박 전체 실제 총액이 최저가보다 1인 5만 원 이내로 비싸면, 고정 일정 장소와 골라 쓰는 카드가 모인 동네까지 대중교통·도보 30분 이내인 숙소를 고른다. 렌터카 여행이면 차로 30분 이내로 본다.', lanes:['air'], res:['link'], guide:['2. 우선순위 5','5. A-9 · 숙소 비교'], convo:['q2','mine2']},
+  {id:'p10', g:'core', tag:'', t:'20% 넘으면 두 안', r:'축제 맞춤 날짜가 가장 싼 날짜보다 20% 넘게 비싸면 혼자 정하지 않아요.', full:'축제에 맞춘 날짜의 1인 총비용이 가능한 다른 날짜 중 가장 싼 경우보다 20% 넘게 비싸면, 혼자 정하지 않고 두 안을 나란히 보여 준다.', lanes:['date'], res:['ask'], guide:['2. 우선순위 6','2. 묻는 순간 4','5. A-4 · 날짜 정하기'], convo:['q2']},
+  {id:'p11', g:'core', tag:'adj', t:'비 오면 실내 카드', r:'비 예보 날엔 야외 고정 일정을 옮기고, 카드는 실내 위주로 바꿔요.', full:'비 예보가 있는 날에는 야외 고정 일정을 다른 날로 옮기고, 그날 카드는 실내 위주로 바꾼다. 옮길 수 없는 축제 행사면 실내 카드를 함께 붙인다.', lanes:['weather','fixed'], res:[], guide:['2. 우선순위 7','6. 여행 전 · 비 예보'], convo:['task','mine2']},
+  {id:'p12', g:'core', tag:'adj', t:'식당은 1년 안 확인', r:'최근 1년 안 출처로 영업·휴무를 확인 못 하면 카드에 넣지 않아요.', full:'먹거리는 그 지역 대표 음식, 그 계절 제철 음식, 축제 먹거리를 카드에 넣는다. 최근 1년 안의 출처로 영업 중인지, 방문 요일에 쉬지 않는지 확인하지 못한 식당은 카드에 넣지 않고 확인 필요 후보로만 둔다.', lanes:['cards'], res:['check'], guide:['2. 우선순위 8','6. 여행 전 · 식당 영업 정보 미확인'], convo:['task','mine']},
+  {id:'p13', g:'core', tag:'', t:'불리한 사실은 결론에', r:'축제 없음·예산 초과·휴무·위험 기상은 결론에서 바로 말해요.', full:'축제 없음, 예산 초과, 가격 급등, 혼잡, 휴무, 위험 기상 같은 불리한 사실은 결론에서 바로 말한다.', lanes:['weather','budget'], res:['chat'], guide:['2. 우선순위 10','7. 여행 전 채팅 답변'], convo:['pref']},
+  {id:'p14', g:'edge', tag:'', t:'결론부터, 동글동글하게', r:'예고 없이 결론부터, 짧은 평문으로, 말끝은 부드럽게 애교 있게 말해요.', full:'예고 없이 결론으로 바로 시작한다. 여행 전 채팅은 추천 날짜와 1인 총비용, 고른 이유 한 문장, 날짜별 고정 일정과 자유 시간, 확인 필요, 가이드북 안내 순서의 평문으로 쓴다. 말투는 예쁘고 동글동글하고 부드럽게, 말끝에 애교를 섞는다.', lanes:[], res:['chat','ask','onsite'], guide:['7. 결과물 · 여행 전 채팅 답변','7. 결과물 · 여행 중 답변'], convo:['q4','pref']},
+  {id:'p15', g:'edge', tag:'new', t:'현장 답은 3문장', r:'묻는 말의 답부터 3문장 안쪽, "더"라고 하시면 이어서 말해요.', full:'여행 중 답변은 묻는 말에 대한 답부터 3문장 안쪽으로 쓴다. 장소 설명은 무엇인지, 왜 유명한지, 지금 볼 포인트 순서로 말하고, "더"라고 하면 역사와 뒷이야기를 이어 간다. 추천은 2~3곳만 걸어서 몇 분인지와 함께 말하고, 다음 고정 일정까지 2시간이 안 남았으면 그 안에 다녀올 곳만 고른다.', lanes:['onsite'], res:['onsite'], guide:['5. B-3 · 답하기','7. 결과물 · 여행 중 답변'], convo:['pref','mine2']},
+  {id:'p16', g:'edge', tag:'new', t:'이야기는 출처대로', r:'공식 출처로 확인한 것만 사실로, 나머지는 전해지는 이야기라고 밝혀요.', full:'장소 이야기는 지자체·관광청·박물관 같은 공식 출처로 확인한 내용만 사실로 말한다. 전설이나 출처가 없는 이야기는 전해지는 이야기라고 밝힌다.', lanes:['cards','onsite'], res:['doc','onsite'], guide:['2. 우선순위 9','5. A-7 · 장소 이야기 쓰기','6. 여행 전 · 장소 이야기 출처 없음'], convo:['mine2']},
+  {id:'p17', g:'edge', tag:'', t:'상태와 조회 시각', r:'확정·예상·미확인을 붙이고, 10일 넘게 남은 날씨는 평년 기준으로 적어요.', full:'모든 정보에 확정·예상·미확인 상태를 붙이고, 모든 가격에 출처와 조회 날짜·시각을 붙인다. 오늘부터 10일 안에 드는 날짜는 예보로, 그 뒤 날짜는 평년값으로 계획한다. 확인할 수 없는 정보는 추측으로 채우지 않는다.', lanes:['festival','weather','air','cards'], res:['check'], guide:['2. 정보 상태와 출처','8. 완료 기준'], convo:['mine']},
+  {id:'p18', g:'edge', tag:'new', t:'위치는 확인받기', r:'위치를 추측하지 않고, 사진 속 장소가 애매하면 이름을 확인받아요.', full:'사용자의 현재 위치를 추측하지 않는다. 위치를 모르면 장소 이름이나 사진을 달라고 한다. 사진으로 알아본 장소가 확실하지 않으면 "~같아요"라고 말하고 이름을 확인받은 뒤 설명한다.', lanes:['onsite'], res:['onsite'], guide:['5. B-1 · 위치 확인','6. 여행 중 · 사진 속 장소가 확실하지 않음'], convo:['g1','mine2']},
+  {id:'p19', g:'edge', tag:'adj', t:'묻는 건 정해진 순간만', r:'처음엔 빠진 조건과 혼자 시간을 한 번에, 중간엔 네 경우에만 물어요.', full:'시작할 때 빠진 조건(출발 공항, 인원, 예산과 그 기준)을 한 번에 묻고, 혼자 있고 싶은 시간이 있으면 같이 알려 달라고 한 줄 붙인다. 여행 전 계획 중에는 예산 초과, 축제 미발표, 날짜 이동 이득, 20% 초과의 네 경우에만 묻는다. 여행 중에는 위치를 모를 때만 되묻는다.', lanes:['input','date','budget'], res:['ask'], guide:['2. 묻는 순간','5. A-1 · 입력 확인'], convo:['q3','mine2']},
+  {id:'p20', g:'edge', tag:'', t:'예약·결제는 안 해요', r:'예약 링크와 가격 조회 시각까지만 드려요.', full:'예약, 결제, 회원가입, 카드·개인정보 입력은 하지 않는다. 예약 링크와 가격 조회 시각만 전달한다.', lanes:['air'], res:['link'], guide:['2. 하지 않는 일','4. 필요한 도구 · 숙소'], convo:['q3']},
+  {id:'p21', g:'edge', tag:'new', t:'위급하면 도움부터', r:'아프거나 위험하다고 하시면 설명보다 긴급 연락처를 먼저 알려요.', full:'아프거나 다쳤거나 위험한 상황이라고 하면 가이드 설명보다 먼저 현지 긴급 전화와 가까운 도움받을 곳을 알린다. 연락처는 가이드북을 만들 때 공식 출처로 확인해 적어 둔다.', lanes:['onsite'], res:['doc','onsite'], guide:['2. 안전','5. A-11 · 안전 정보','6. 여행 중 · 위급 상황'], convo:['mine2']}
+];
+
+const LANES = [
+  {id:'input', name:'입력 확인',
+   data:{t:'처음 받은 조건', s:'○○시 · 내년 4월쯤 · 2박 3일 · 2명', st:'unk', stt:'2가지 빠짐'},
+   judge:{t:'빠진 조건은 한 번에', v:'시작 질문 1번', vt:'ok'}, to:'ask', minor:[],
+   why:'필수 자료 가운데 출발 공항과 예산이 없어서 질문 한 번으로 둘 다 물었어요. 같은 질문 끝에 혼자 있고 싶은 시간이 있는지 한 줄 붙였고, 답을 받은 뒤에는 묻지 않고 끝까지 진행했어요.',
+   extra:'가상 답 · □□공항, 1인 55만 원, 금요일 밤은 혼자 있을래',
+   say:'출발 공항이랑 예산 알려 주세요오. 예산이 1인 기준인지 전체 기준인지도요! 혼자 있고 싶은 시간이 있으면 같이 말해 주세요.',
+   guide:['2. 묻는 순간 · 시작할 때','3. 필요한 자료','5. A-1 · 입력 확인'], convo:['q3','mine2']},
+  {id:'festival', name:'축제',
+   data:{t:'△△꽃축제 공식 일정', s:'둘째 주 금~일 · 토 15:00 퍼레이드 · 20:00 불꽃놀이', st:'ok', stt:'확정'},
+   judge:{t:'확정만 고정 일정', v:'토요일 2개 확정', vt:'ok'}, to:'doc', minor:[],
+   why:'축제 공식 안내(가상)에 퍼레이드와 불꽃놀이 시간이 나와 있어서 확정으로 표시하고, 토요일 고정 일정 후보로 먼저 올렸어요.',
+   extra:'발표 전이었다면 작년 일정을 찾아 두고, 작년 기준 예상으로 짤지 발표를 기다릴지 먼저 물어요.',
+   say:'퍼레이드랑 불꽃놀이가 둘 다 토요일이라 날짜를 딱 맞출 수 있어요, 신나요!',
+   guide:['2. 우선순위 2','5. A-2 · 축제 조사','6. 여행 전 · 축제가 공식 확정됨'], convo:['task','q2']},
+  {id:'weather', name:'날씨',
+   data:{t:'4월 평년값', s:'출발까지 10일 넘게 남음 · 토요일은 비 잦은 때', st:'est', stt:'평년 기준'},
+   judge:{t:'비 잦은 날엔 실내 카드', v:'10일 전 예보 재확인', vt:'est'}, to:'chat', minor:['check'],
+   why:'여행일까지 10일 넘게 남아서 예보 대신 평년값을 쓰고 평년 기준이라고 적었어요. 토요일 축제 행사는 옮길 수 없어서, 그날 자유 시간 카드에 실내 장소를 함께 넣었어요.',
+   say:'토요일이 평년엔 비가 잦은 편이라 조금 걱정돼요. 출발 10일 전부터 예보로 다시 볼게요.',
+   guide:['2. 정보 상태와 출처 · 10일 규칙','2. 우선순위 7','6. 여행 전 · 비 예보'], convo:['task','mine']},
+  {id:'date', name:'날짜',
+   data:{t:'날짜 후보 3안', s:'1인 50만 · 44.6만 · 45.8만 원', st:'calc', stt:'합계 계산'},
+   judge:{t:'큰 틀 먼저 · 20% 규칙', v:'A안 · +12.1%', vt:'pick'}, to:'chat', minor:[],
+   why:'축제와 맞는 A안이 가장 싼 B안보다 1인 54,000원(12.1%) 비싸요. 20%를 넘지 않아서 두 안을 나란히 묻지 않고 A안으로 정했어요.',
+   calc:'(500,000 − 446,000) ÷ 446,000 = 12.1% · 기준선 446,000 × 1.2 = 535,200원',
+   say:'셋째 주가 조금 더 싸지만 축제를 놓치면 너무 아쉬우니까 둘째 주로 골랐어요 히히.',
+   chart:'date', guide:['2. 우선순위 1 · 6','2. 묻는 순간 4','5. A-4 · 날짜 정하기'], convo:['q1','q2']},
+  {id:'fixed', name:'고정 일정', tag:'new',
+   data:{t:'시간이 정해진 후보', s:'토 10:00 도자기 체험 · 15:00 퍼레이드 · 20:00 불꽃놀이 · 금요일 밤 혼자 시간', st:'calc', stt:'토 후보 3개'},
+   judge:{t:'하루 2개 · 혼자 시간 먼저', v:'체험은 일요일로', vt:'pick'}, to:'doc', minor:[],
+   why:'토요일에 시간이 정해진 후보가 3개라 하루 2개 규칙을 넘었어요. 축제 핵심 행사인 퍼레이드와 불꽃놀이를 남기고, 도자기 체험은 같은 공방의 일요일 10시 예약으로 옮겼어요. 금요일 밤은 혼자 있을 시간이라 카드도 넣지 않았어요.',
+   calc:'항공편 빼고 금 0개 · 토 2개 · 일 1개 (기준 하루 2개)',
+   say:'토요일엔 딱 두 개만 고정했어요. 나머지는 다 자유 시간이니까 마음 가는 대로 다니세요오.',
+   chart:'fixed', guide:['2. 개인 시간 규칙 1 · 2 · 4','5. A-5 · 고정 일정 정하기','6. 여행 전 · 고정 일정 후보가 2개를 넘음'], convo:['task2','g2']},
+  {id:'cards', name:'카드·이야기', tag:'new',
+   data:{t:'카드 후보와 장소 이야기', s:'식당 4곳 · 볼거리·쉴 곳 6곳 · 이야기 5개', st:'unk', stt:'1곳 미확인'},
+   judge:{t:'15분 · 1년 안 영업 · 출처', v:'카드 9곳 · 1곳 보류', vt:'hold'}, to:'doc', minor:['check'],
+   why:'자유 시간마다 걸어서 15분 안쪽 곳만 카드로 붙였어요. 식당은 최근 1년 안 출처로 방문 요일 영업을 확인한 곳만 넣었고, ◇◇국밥은 일요일 영업을 확인하지 못해 확인 필요 후보로 뒀어요. ○○향교 은행나무를 심은 선비 이야기는 공식 출처를 찾지 못해 전해지는 이야기로 표시했어요.',
+   say:'국밥집이 일요일에 문 여는지 아직 몰라서 카드엔 안 넣었어요오.',
+   guide:['2. 개인 시간 규칙 3','2. 우선순위 8 · 9','5. A-6 · A-7'], convo:['g2','mine2']},
+  {id:'air', name:'항공·숙소',
+   data:{t:'항공 3편 · 숙소 3곳', s:'1인 실제 총액 · 항공 18.2만~25.1만 · 숙소 9.6만~14.9만 원', st:'unk', stt:'숙소 1곳 청소비 미확인'},
+   judge:{t:'실제 총액 · 5만 원 규칙', v:'B편 · 숙소 C', vt:'pick'}, to:'link', minor:['check'],
+   why:'항공 A편은 수하물을 더하면 182,000원인데 06:40 출발이라, 32,000원 더 비싼 09:30 B편을 골랐어요. 숙소 B는 9.6만 원이지만 청소비를 확인하지 못해 최저가로 확정하지 않았어요. 확인된 최저 A는 고정 일정·카드 동네까지 45분이라, 31,000원 더 비싸고 20분 거리인 C를 골랐어요.',
+   say:'새벽 비행기보다 아침 9시 반 비행기가 훨씬 편하죠? 숙소 B는 청소비를 몰라서 아직은 못 골랐어요, 아쉬워요.',
+   charts:['flight','hotel'], guide:['2. 우선순위 3 · 4 · 5','5. A-8 · A-9','6. 여행 전 · 항공·숙소 5만 원'], convo:['q2','mine']},
+  {id:'budget', name:'예산',
+   data:{t:'1인 비용 합계', s:'항공 + 숙소 + 교통 + 식비 + 입장료·체험', st:'calc', stt:'500,000원'},
+   judge:{t:'예산과 비교', v:'55만 원 안 · 질문 없음', vt:'ok'}, to:'chat', minor:[],
+   why:'항공 214,000 + 숙소 149,000 + 현지 교통 28,000 + 식비(예상) 90,000 + 입장료·체험 19,000 = 1인 500,000원이에요. 예산 550,000원 안이라 묻지 않고 진행했어요. 둘이면 1,000,000원이에요.',
+   say:'예산보다 5만 원 여유가 있어요, 다행이에요!',
+   chart:'budget', guide:['2. 묻는 순간 1','5. A-10 · 예산 합계','6. 여행 전 · 총비용이 예산을 넘음'], convo:['q3']},
+  {id:'onsite', name:'현장 안내', phase:'trip', tag:'new',
+   data:{t:'여행 중 질문 2개', s:'토 11:20 사진 "여기 뭐야?" · 13:40 "근처에 뭐 먹지?"', st:'unk', stt:'사진 속 장소 애매'},
+   judge:{t:'위치 확인 · 남은 시간 안에서', v:'확인받고 3문장', vt:'hold'}, to:'onsite', minor:[],
+   why:'사진만으로는 ○○향교인지 확실하지 않아서 추측하지 않고 이름을 확인받았어요. 확인된 뒤에는 3문장으로만 설명했어요. 13:40에는 15:00 퍼레이드까지 1시간 20분이 남아서, 걸어서 10분 안쪽이고 토요일 영업을 확인한 곳만 골랐어요.',
+   calc:'15:00 − 13:40 = 1시간 20분 · 2시간 안쪽이라 남은 시간 안에서만 추천',
+   talk:true, guide:['2. 개인 시간 규칙 5','5. B · 부를 때만 현장 안내','6. 여행 중'], convo:['g1','mine2']}
+];
+
+const RESULTS = [
+  {id:'ask', t:'질문', row:'2 / span 1', card:'<span class="ns">시작 1번 · 중간 0번</span>',
+   why:'시작할 때 빠진 조건과 혼자 있을 시간을 한 번에 물었어요. 여행 전 중간 질문 네 가지(예산 초과, 축제 미발표, 날짜 이동 이득, 20% 초과)에는 해당하지 않아서 더 묻지 않았어요.',
+   say:'출발 공항이랑 예산 알려 주세요오. 예산이 1인 기준인지 전체 기준인지도요! 혼자 있고 싶은 시간이 있으면 같이 말해 주세요.', guide:['2. 묻는 순간','5. A-1 · 입력 확인'], convo:['q3','mine2']},
+  {id:'chat', t:'채팅 결론', row:'3 / span 3', card:'<span class="ns">○○시는 4월 둘째 주 금요일부터 2박 3일이 제일 좋아요오. 1인 총비용은 50만 원이에요.</span><span class="chip pick">여행 전 · 몽글이 말투</span>',
+   why:'추천 날짜와 1인 총비용, 고른 이유 한 문장, 날짜별 고정 일정과 자유 시간, 확인이 필요한 것, 가이드북 안내 순서로 짧은 평문을 써요.', chat:true, guide:['7. 결과물 · 여행 전 채팅 답변'], convo:['q4','pref']},
+  {id:'doc', t:'나만의 가이드북', row:'6 / span 2', card:'<span class="ns">날짜별 일정 · 골라 쓰는 카드 · 장소 이야기 · 비교표</span>',
+   why:'고정 일정과 자유 시간, 골라 쓰는 카드, 장소 이야기, 항공·숙소 비교, 예산, 안전 연락처를 표가 있는 문서로 따로 만들어요. 시연이라 실제 문서는 만들지 않았고 목차까지만 있어요.', toc:true, guide:['7. 결과물 · 나만의 가이드북'], convo:['q4','g1']},
+  {id:'link', t:'예약 링크 · 조회 시각', row:'8 / span 1', card:'<span class="ns">B편 · 숙소 C 링크만 드려요. 결제는 직접!</span>',
+   why:'예약, 결제, 회원가입, 카드·개인정보 입력은 하지 않아요. 고른 항공편과 숙소의 예약 링크, 가격 조회 시각만 드리고 결제 직전에 가격을 다시 확인하라고 알려 드려요. 시연이라 실제 링크는 없어요.', guide:['2. 하지 않는 일','2. 정보 상태와 출처'], convo:['q3']},
+  {id:'check', t:'확인 필요 목록', row:'9 / span 1', card:'<span class="li">숙소 B 청소비</span><span class="li">◇◇국밥 일요일 영업</span><span class="li">토요일 예보 · 출발 10일 전</span>',
+   why:'확정하지 못한 것은 추측으로 채우지 않고, 무엇을 어디서 확인할지와 함께 가이드북 목록에 남겨요.', holds:true, guide:['2. 정보 상태와 출처','8. 완료 기준'], convo:['mine']},
+  {id:'onsite', t:'현장 답변', row:'11 / span 1', card:'<span class="ns">"○○향교 같아요" 확인 후 3문장 · 퍼레이드 전 10분 안쪽 2곳</span>',
+   why:'부르실 때만 답해요. 묻는 말의 답부터 3문장 안쪽으로, 위치가 애매하면 확인받고, 다음 고정 일정 전에 다녀올 수 있는 곳만 골라요.', talk:true, guide:['5. B · 부를 때만 현장 안내','7. 결과물 · 여행 중 답변'], convo:['g1','pref']}
+];
+
+const VERIFY = {
+  why:'완료 기준을 하나씩 확인한 시연 결과예요. 실제 실행이 아니라서 해 보지 않은 일은 그대로 적었어요.',
+  checks:[
+    ['ok','고정 일정이 항공편을 빼고 금 0개 · 토 2개 · 일 1개예요'],
+    ['ok','금요일 밤 혼자 있을 시간에는 카드를 넣지 않았어요'],
+    ['ok','카드는 모두 걸어서 15분 안쪽이에요 (시연 값)'],
+    ['ok','장소 이야기마다 출처와 상태를 붙이고, 출처 없는 이야기는 전해지는 이야기로 표시했어요'],
+    ['ok','5만 원·30분·20% 규칙을 적용하고 고른 이유를 적었어요'],
+    ['ok','1인 500,000원 · 2인 1,000,000원이 항목 합과 같아요'],
+    ['ok','예산 550,000원 안이고, 중간 질문은 0번이었어요'],
+    ['ok','예약·결제·개인정보 입력은 하지 않았어요'],
+    ['part','가이드북과 안전 연락처는 시연이라 목차까지만 있어요']
+  ],
+  say:'꼼꼼히 다 봤어요. 실제 여행이 정해지면 가이드북까지 만들어 드릴게요!',
+  guide:['5. A-12 · 검증','5. A-13 · 전달','8. 완료 기준'], convo:['q4','pref']
+};
+
+const CHARTS = {
+  fixed:{t:'날짜별 고정 일정 수', isNew:true, wide:true, unit:'개', note:'시연 값 · 항공편은 세지 않아요', rule:'항공편을 빼고 하루 2개까지예요. 토요일 후보 3개 중 도자기 체험을 일요일로 옮겼어요.', max:3, thr:2, thrLabel:'하루 최대 2개', rows:[
+    {l:'금 · 도착일', v:0, k:'', n:'밤은 혼자 시간'},
+    {l:'토 · 처음 후보', v:3, k:'over', n:'기준 넘음'},
+    {l:'토 · 정리 후', v:2, k:'pick', n:'퍼레이드·불꽃놀이'},
+    {l:'일 · 출발일', v:1, k:'', n:'도자기 체험'}]},
+  date:{t:'날짜 후보별 1인 총비용', rule:'축제 맞춤 A안이 최저 B안 +20% 기준선 안쪽이라 혼자 정했어요.', max:560000, thr:535200, thrLabel:'최저 +20% · 535,200원', rows:[
+    {l:'A안 · 둘째 주 (축제)', v:500000, k:'pick', n:'+12.1% · 선택'},
+    {l:'B안 · 셋째 주', v:446000, k:'', n:'가장 쌈'},
+    {l:'C안 · 넷째 주', v:458000, k:'', n:'+2.7%'}]},
+  flight:{t:'왕복 항공 실제 총액 (1인)', rule:'최저 A편 +5만 원 안쪽에서 시간대가 좋은 B편을 골랐어요.', max:260000, thr:232000, thrLabel:'최저 +5만 원 · 232,000원', rows:[
+    {l:'A편 · 06:40 출발', v:182000, k:'', n:'최저 · 나쁜 시간대'},
+    {l:'B편 · 09:30 출발', v:214000, k:'pick', n:'+32,000원 · 선택'},
+    {l:'C편 · 10:10 출발', v:251000, k:'', n:'+69,000원'}]},
+  hotel:{t:'숙소 2박 실제 총액 (1인)', rule:'청소비를 모르는 B는 빼고, 확인된 최저 A +5만 원 안쪽에서 고정 일정·카드 동네까지 20분인 C를 골랐어요.', max:180000, thr:168000, thrLabel:'확인된 최저 +5만 원 · 168,000원', rows:[
+    {l:'A · 동네까지 45분', v:118000, k:'', n:'확인된 최저'},
+    {l:'B · 25분', v:96000, k:'unk', n:'청소비 미확인'},
+    {l:'C · 20분', v:149000, k:'pick', n:'+31,000원 · 선택'}]},
+  budget:{t:'1인 비용 내역과 예산', rule:'합계 500,000원이 예산 550,000원 안이라 묻지 않았어요.', max:600000, thr:550000, thrLabel:'예산 · 550,000원', thrRow:5, rows:[
+    {l:'항공 (B편)', v:214000, k:''},
+    {l:'숙소 (C, 2박)', v:149000, k:''},
+    {l:'현지 교통', v:28000, k:''},
+    {l:'식비', v:90000, k:'est', n:'예상'},
+    {l:'입장료·체험', v:19000, k:''},
+    {l:'합계', v:500000, k:'pick', n:'예산 안'}]}
+};
+
+const HOLDS = [
+  {tag:'보류', cls:'hold', lane:'air', t:'숙소 B 최저가 확정', why:'요금 상세에 청소비가 보이지 않아 실제 총액을 알 수 없어요.', need:'숙소 B 예약 화면의 요금 상세(세금·청소비 포함 총액) 캡처나 링크', next:'B도 25분 거리라서, 총액이 C보다 싸게 확인되면 B로 바꿔요.'},
+  {tag:'보류', cls:'hold', lane:'cards', t:'◇◇국밥 카드에 넣기', why:'최근 1년 안의 출처로 일요일 영업 여부를 확인하지 못했어요.', need:'가게 공지나 지도 앱의 최신 영업시간·휴무일 정보', next:'열면 일요일 아침 카드에 넣고, 쉬면 걸어서 15분 안쪽 다른 식당으로 바꿔요.'},
+  {tag:'재확인', cls:'est', lane:'weather', t:'토요일 날씨 예보', why:'출발까지 10일 넘게 남아서 아직 예보가 없어요. 지금은 평년값으로 계획했어요.', need:'출발 10일 전부터 나오는 기상청 예보', next:'비 예보가 나오면 토요일 카드를 실내 위주로 바꿔요.'},
+  {tag:'보류', cls:'hold', lane:'onsite', phase:'trip', t:'사진 속 장소 설명', why:'사진만으로는 ○○향교인지 확실하지 않아서 설명을 미뤘어요.', need:'근처 안내판의 장소 이름이나 간판 사진', next:'이름이 확인되면 무엇인지, 왜 유명한지, 지금 볼 포인트를 3문장으로 설명해요.'}
+];
+
+const CHAT = [
+  '○○시는 4월 둘째 주 금요일부터 2박 3일이 제일 좋아요오. 1인 총비용은 50만 원, 둘이면 100만 원이에요(시연 값 · 가상 조회 기준).',
+  '△△꽃축제 퍼레이드랑 불꽃놀이가 둘 다 토요일이라 날짜를 딱 맞췄어요. 셋째 주보다 1인 5만 4천 원 더 들지만 20% 안쪽이라 축제 쪽으로 골랐어요 히히.',
+  '금요일은 9시 반 비행기로 가서 저녁까지 자유 시간이고, 말씀하신 대로 밤은 혼자만의 시간으로 비워 뒀어요.',
+  '토요일 고정 일정은 오후 3시 퍼레이드랑 밤 8시 불꽃놀이 두 개뿐이에요. 도자기 체험은 일요일 오전으로 옮겼고, 나머지 시간엔 골라 쓰는 카드만 붙여 뒀어요.',
+  '일요일은 오전 10시 도자기 체험 하나만 고정이고, 저녁 비행기 전까지 마음대로 다니시면 돼요.',
+  '다만 토요일은 평년 기준으로 비가 잦은 때라 조금 걱정돼요. 실내 카드도 넣어 뒀고, 출발 10일 전부터 예보로 다시 볼게요. 숙소 B 청소비랑 ◇◇국밥 일요일 영업은 아직 확인 중이라 확정하지 않았어요.',
+  '일정이랑 카드, 장소 이야기, 항공·숙소 비교는 나만의 가이드북에 담아 둘게요!'
+];
+
+const ONSITE = [
+  {when:'토요일 11:20 · 사진으로 물어보심', msgs:[
+    {who:'user', photo:true, t:'여기 뭐야?'},
+    {who:'guide', t:'사진만 봐서는 ○○향교 같아요. 근처 안내판에 이름이 보이면 알려 주세요, 맞으면 바로 설명해 드릴게요오.'},
+    {who:'user', t:'맞아, ○○향교래'},
+    {who:'guide', t:'○○향교는 조선 시대에 나라에서 세운 지방 학교예요. 마당의 커다란 은행나무가 제일 유명하고, 지금은 정문 오른쪽에서 강당 지붕과 함께 한눈에 보여요. 더 궁금하시면 "더"라고 해 주세요!'}]},
+  {when:'토요일 13:40 · 다음 고정 일정 15:00 퍼레이드', msgs:[
+    {who:'user', t:'근처에 뭐 먹지?'},
+    {who:'guide', t:'퍼레이드까지 1시간 20분 남아서 걸어서 10분 안쪽으로만 골랐어요. 시장 칼국숫집은 6분, 주꾸미 볶음집은 9분 거리이고 둘 다 토요일 영업을 확인했어요. 칼국숫집이 퍼레이드 길에 더 가까워요!'}]}
+];
+
+const TOC = ['요약 · 추천 날짜와 1인·전체 총비용','날짜별 일정 · 고정 일정, 자유 시간, 혼자 있을 시간','골라 쓰는 카드 · 걸어서 15분 안쪽','장소 이야기 · 출처와 상태','축제·행사','날씨 (평년 기준)','먹거리','항공 비교','숙소 비교','예산 내역','안전·긴급 연락처','확인 필요 목록과 결제 직전에 다시 볼 것','출처 목록'];
+
+const $ = (s, el=document) => el.querySelector(s);
+const $$ = (s, el=document) => [...el.querySelectorAll(s)];
+const fmt = n => n.toLocaleString('ko-KR');
+const REDUCE = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const SVGNS = 'http://www.w3.org/2000/svg';
+const STEPS = [...LANES.filter(l=>l.phase!=='trip').map(l=>({id:l.id, name:l.name, phase:'pre'})), {id:'verify', name:'검증·전달', phase:'pre'}, ...LANES.filter(l=>l.phase==='trip').map(l=>({id:l.id, name:l.name, phase:'trip'}))].map((s,i)=>({...s, n:i+1}));
+const stepNo = id => (STEPS.find(s=>s.id===id) || {}).n;
+const TAGS = {new:'<span class="tag new">새로</span>', adj:'<span class="tag adj">고침</span>'};
+const GROUPS = {time:'개인 시간', core:'핵심 원칙', edge:'말투와 경계'};
+const laneIdx = id => LANES.findIndex(l=>l.id===id);
+const laneById = id => LANES.find(l=>l.id===id);
+const resById = id => RESULTS.find(r=>r.id===id);
+
+/* ---------- static parts ---------- */
+function renderPrinciples(){
+  const card = (p,i) => `<button type="button" class="pcard" data-p="${p.id}" aria-pressed="false"><span class="pn">${i+1}</span><span class="pt">${p.t}${TAGS[p.tag]||''}</span><span class="pr">${p.r}</span></button>`;
+  Object.keys(GROUPS).forEach(g=>{ $('#p-'+g).innerHTML = PRINCIPLES.map((p,i)=>p.g===g?card(p,i):'').join(''); });
+}
+function renderSteps(){
+  const PH = {pre:'여행 전', trip:'여행 중'};
+  $('#steps').innerHTML = STEPS.map((s,i)=>`${(!i || STEPS[i-1].phase!==s.phase) ? `<span class="phase" aria-hidden="true">${PH[s.phase]}</span>` : ''}<button type="button" role="tab" class="step" id="tab-${s.id}" data-step="${s.id}" aria-selected="false" aria-controls="evidence" tabindex="${i?-1:0}"><span class="sn">${s.n}</span>${s.name}</button>`).join('');
+}
+function renderDiagram(){
+  let h = '<div class="col-h" style="grid-column:1;grid-row:1">확인한 자료</div><div class="col-h" style="grid-column:2;grid-row:1">판단 근거</div><div class="col-h" style="grid-column:3;grid-row:1">결과</div>';
+  h += '<div class="phase-div" style="grid-row:10">여행 중 · 부르실 때만 답해요</div>';
+  LANES.forEach((l,i)=>{
+    const row = l.phase==='trip' ? 11 : i+2;
+    h += `<button type="button" class="node data enter" data-lane="${l.id}" style="grid-column:1;grid-row:${row};--d:${100+i*110}ms"><span class="chip ${l.data.st}">${l.data.stt}</span><span class="nt">${l.data.t}</span><span class="ns">${l.data.s}</span></button>`;
+    h += `<button type="button" class="node judge enter" data-lane="${l.id}" style="grid-column:2;grid-row:${row};--d:${480+i*110}ms"><span class="nt"><span class="sn">${stepNo(l.id)}</span>${l.judge.t}${TAGS[l.tag]||''}</span><span class="chip ${l.judge.vt}">${l.judge.v}</span></button>`;
+  });
+  RESULTS.forEach((r,k)=>{
+    h += `<button type="button" class="node result enter" data-result="${r.id}" style="grid-column:3;grid-row:${r.row};--d:${900+k*130}ms"><span class="nt">${r.t}</span>${r.card}</button>`;
+  });
+  $('#diagram').insertAdjacentHTML('beforeend', h);
+  $$('#diagram .node').forEach(n=>n.addEventListener('animationend', e=>{ if (e.animationName==='rise') n.classList.remove('enter'); }));
+}
+function barsHTML(c, compact){
+  const pct = v => (v/c.max*100).toFixed(2)+'%', u = c.unit || '원';
+  const rows = c.rows.map((r,i)=>{
+    const thr = (c.thrRow==null || c.thrRow===i) ? `<span class="thr" style="--t:${pct(c.thr)}"></span>` : '';
+    return `<div class="brow"><span class="blabel">${r.l}</span><span class="track"><span class="bar ${r.k||''}" style="--w:${pct(r.v)};--d:${i*130}ms"></span>${thr}</span><span class="bval">${fmt(r.v)}${u}${r.n?`<small>${r.n}</small>`:''}</span></div>`;
+  }).join('');
+  const label = `${c.t}. ${c.rows.map(r=>`${r.l} ${fmt(r.v)}${u}`).join(', ')}. 기준선 ${c.thrLabel}`;
+  return `<div class="bars${compact?' compact':''}" role="img" aria-label="${label}">${rows}</div><p class="thr-key"><i></i>${c.thrLabel}</p>`;
+}
+function renderCharts(){
+  $('#charts').innerHTML = Object.values(CHARTS).map(c=>`<article class="chart${c.wide?' wide':''}"><h3>${c.t}${c.isNew?TAGS.new:''}</h3><p class="rule">${c.rule}</p>${barsHTML(c)}<p class="fine">${c.note||'시연 값 · 가상 조회 기준'}</p></article>`).join('');
+}
+const kvHTML = hd => `<dl class="kv"><dt>이유</dt><dd>${hd.why}</dd><dt>필요한 자료</dt><dd>${hd.need}</dd><dt>확인되면</dt><dd>${hd.next}</dd></dl>`;
+function renderHolds(){
+  $('#holds').innerHTML = HOLDS.map(hd=>`<article class="hcard"><span class="chip ${hd.cls}">${hd.tag}</span><h3>${hd.t}</h3>${kvHTML(hd)}<button type="button" class="lane-link" data-goto="${hd.lane}">${stepNo(hd.lane)}단계 경로 보기</button></article>`).join('');
+}
+const talkHTML = t => `<div class="talk"><span class="when">${t.when}</span>${t.msgs.map(m=> m.who==='user'
+  ? `<div class="msg user"><p class="bubble"><span class="sr">여행자: </span>${m.photo?'<span class="photo">사진</span>':''}${m.t}</p></div>`
+  : `<div class="msg guide"><span class="mongle sm" aria-hidden="true">${MONGLE}</span><p class="bubble"><span class="sr">몽글이: </span>${m.t}</p></div>`).join('')}</div>`;
+function renderChat(){
+  $('#chatLines').innerHTML = '<span class="sr">몽글이: </span><p class="eyebrow">여행 전 채팅 결론</p>' + CHAT.map(l=>`<p>${l}</p>`).join('');
+  $('#toc').innerHTML = TOC.map(t=>`<li>${t}</li>`).join('');
+  $('#talks').innerHTML = ONSITE.map(talkHTML).join('');
+}
+
+/* ---------- evidence panel ---------- */
+const sayHTML = t => `<div class="say"><span class="mongle sm" aria-hidden="true">${MONGLE}</span><p class="bubble"><span class="sr">몽글이: </span>${t}</p></div>`;
+const guideHTML = g => `<div class="ev-block ev-guide"><h4>지침에서</h4><ul>${g.map(x=>`<li>${x}</li>`).join('')}</ul></div>`;
+const ccard = c => {
+  const body = c.q ? `<p>질문 · ${c.q}</p><p class="ca"><b>답 ${c.a}</b><span>${c.pick}</span></p>` : `<p>${c.a || c.pick}</p>`;
+  return `<div class="ccard${c.mine?' mine':''}"><span class="cw">${c.who}</span>${body}</div>`;
+};
+const convoHTML = keys => `<div class="ev-block"><h4>대화 속 근거</h4><div class="convo">${keys.map(k=>ccard(CONVO[k])).join('')}</div></div>`;
+const holdHTML = hd => `<div class="hold-box"><span class="chip ${hd.cls}">${hd.tag}</span><strong>${hd.t}</strong>${kvHTML(hd)}</div>`;
+const headHTML = (k, t) => `<div><p class="eyebrow">${k}</p><h3 class="ev-title">${t}</h3></div>`;
+const laneLinks = ids => `<div class="ev-lanes">${ids.map(id=>`<button type="button" class="lane-link" data-goto="${id}">${stepNo(id)} ${laneById(id).name}</button>`).join('')}</div>`;
+
+function evLane(l){
+  const hd = HOLDS.find(x=>x.lane===l.id && x.cls==='hold');
+  const charts = l.charts || (l.chart ? [l.chart] : []);
+  return [
+    headHTML(`단계 ${stepNo(l.id)} · ${l.phase==='trip'?'여행 중':'여행 전'} · ${l.name} · 시연 예시`, l.judge.t),
+    `<p class="ev-why">${l.why}</p>`,
+    l.calc ? `<p class="calc-line num">${l.calc}</p>` : '',
+    ...charts.map(k=>`<div class="ev-block"><h4>${CHARTS[k].t}</h4>${barsHTML(CHARTS[k], true)}</div>`),
+    l.extra ? `<p class="ev-extra">${l.extra}</p>` : '',
+    l.talk ? `<div class="ev-block"><h4>여행 중 대화 · 시연 예시</h4><div class="ev-talks">${ONSITE.map(talkHTML).join('')}</div></div>` : '',
+    l.say ? sayHTML(l.say) : '',
+    hd ? holdHTML(hd) : '',
+    guideHTML(l.guide),
+    convoHTML(l.convo)
+  ];
+}
+function evPrinciple(p){
+  const n = PRINCIPLES.indexOf(p)+1;
+  const res = p.res.map(id=>`<span class="lane-link static">결과 · ${resById(id).t}</span>`).join('');
+  const kind = p.tag==='new' ? ' · 새로 더함' : p.tag==='adj' ? ' · 새 구조에 맞춰 고침' : ' · 기존 원칙';
+  return [
+    headHTML(`SOUL.md ${GROUPS[p.g]} ${n}${kind}`, p.t),
+    `<p class="ev-why">${p.full}</p>`,
+    `<div class="ev-block"><h4>밝아진 판단 경로</h4>${p.lanes.length?laneLinks(p.lanes):''}${res?`<div class="ev-lanes"${p.lanes.length?' style="margin-top:6px"':''}>${res}</div>`:''}</div>`,
+    guideHTML(p.guide),
+    convoHTML(p.convo)
+  ];
+}
+function evResult(r){
+  const feeds = LANES.filter(l=>l.to===r.id || l.minor.includes(r.id)).map(l=>l.id);
+  const talk = r.chat
+    ? `<div class="say"><span class="mongle sm" aria-hidden="true">${MONGLE}</span><div class="bubble chat-lines"><span class="sr">몽글이: </span>${CHAT.map(x=>`<p>${x}</p>`).join('')}</div></div>`
+    : (r.say ? sayHTML(r.say) : '');
+  return [
+    headHTML('결과 · 시연 예시', r.t),
+    `<p class="ev-why">${r.why}</p>`,
+    talk,
+    r.toc ? `<ol class="toc">${TOC.map(t=>`<li>${t}</li>`).join('')}</ol>` : '',
+    r.talk ? `<div class="ev-talks">${ONSITE.map(talkHTML).join('')}</div>` : '',
+    r.holds ? HOLDS.filter(x=>x.phase!=='trip').map(holdHTML).join('') : '',
+    feeds.length ? `<div class="ev-block"><h4>이 결과로 이어진 단계</h4>${laneLinks(feeds)}</div>` : '',
+    guideHTML(r.guide),
+    convoHTML(r.convo)
+  ];
+}
+function evVerify(){
+  return [
+    headHTML(`단계 ${stepNo('verify')} · 여행 전 · 검증·전달 · 시연 예시`, '완료 기준 확인'),
+    `<p class="ev-why">${VERIFY.why}</p>`,
+    `<ul class="checks">${VERIFY.checks.map(([k,t])=>`<li class="${k}"><span class="mk">${k==='ok'?'완료':'시연'}</span><span>${t}</span></li>`).join('')}</ul>`,
+    sayHTML(VERIFY.say),
+    guideHTML(VERIFY.guide),
+    convoHTML(VERIFY.convo)
+  ];
+}
+function evDefault(){
+  return [
+    headHTML('전체 보기', '어떤 판단이 궁금하세요?'),
+    '<p class="ev-why">원칙 카드나 단계 탭, 다이어그램 카드를 고르면 그 경로가 밝아지고 여기에 대화 속 근거가 펼쳐져요.</p>',
+    '<div class="ev-block"><h4>상태 표시</h4><div class="ev-legend"><span class="chip ok">확정</span><span class="chip est">예상</span><span class="chip unk">미확인</span><span class="chip hold">보류</span><span class="chip">계산</span><span class="chip pick">선택</span></div></div>',
+    '<p class="keys"><kbd>Tab</kbd> 이동 · <kbd>←</kbd> <kbd>→</kbd> 단계 · <kbd>1</kbd>~<kbd>9</kbd>, <kbd>0</kbd> 단계 바로 가기 · <kbd>Esc</kbd> 전체 보기</p>',
+    sayHTML('궁금한 단계를 눌러 주시면 제가 왜 그렇게 골랐는지 차근차근 보여 드릴게요오.')
+  ];
+}
+function renderEvidence(sel){
+  let parts;
+  if (!sel) parts = evDefault();
+  else if (sel.type==='principle') parts = evPrinciple(PRINCIPLES.find(p=>p.id===sel.id));
+  else if (sel.type==='result') parts = evResult(resById(sel.id));
+  else parts = sel.id==='verify' ? evVerify() : evLane(laneById(sel.id));
+  const ev = $('#evidence');
+  ev.innerHTML = parts.filter(Boolean).join('');
+  [...ev.children].forEach((c,i)=>{ c.classList.add('unfold'); c.style.setProperty('--d', `${i*70}ms`); });
+  ev.scrollTop = 0;
+}
+
+/* ---------- wires, light dots, ripples ---------- */
+const wires = $('#wires');
+const EDGES = [];
+let dotLayer = null;
+function buildEdges(){
+  const add = (lane, kind, to) => { const p = document.createElementNS(SVGNS,'path'); if (kind==='minor') p.setAttribute('class','minor'); wires.appendChild(p); EDGES.push({el:p, lane, kind, to}); };
+  LANES.forEach(l=>{ add(l.id,'in',null); add(l.id,'out',l.to); l.minor.forEach(m=>add(l.id,'minor',m)); });
+  dotLayer = document.createElementNS(SVGNS,'g'); wires.appendChild(dotLayer);
+}
+const box = el => ({l:el.offsetLeft, t:el.offsetTop, r:el.offsetLeft+el.offsetWidth, b:el.offsetTop+el.offsetHeight, cy:el.offsetTop+el.offsetHeight/2});
+const curve = (x1,y1,x2,y2) => { const dx = Math.max(20,(x2-x1)/2), f = v => v.toFixed(1); return `M${f(x1)} ${f(y1)} C${f(x1+dx)} ${f(y1)} ${f(x2-dx)} ${f(y2)} ${f(x2)} ${f(y2)}`; };
+function layoutWires(){
+  const d = $('#diagram'), W = d.offsetWidth, H = d.offsetHeight;
+  wires.setAttribute('width', W); wires.setAttribute('height', H); wires.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  EDGES.forEach(e=>{
+    const j = box($(`.node.judge[data-lane="${e.lane}"]`));
+    if (e.kind==='in'){ const a = box($(`.node.data[data-lane="${e.lane}"]`)); e.el.setAttribute('d', curve(a.r, a.cy, j.l, j.cy)); }
+    else { const r = box($(`.node.result[data-result="${e.to}"]`)); const y = Math.min(Math.max(j.cy, r.t+20), r.b-20); e.el.setAttribute('d', curve(j.r, j.cy, r.l, y)); }
+  });
+}
+function drawIn(){
+  if (REDUCE) return;
+  EDGES.forEach(e=>{
+    const el = e.el, delay = (e.kind==='in' ? 850 : 1200) + laneIdx(e.lane)*110 + (e.kind==='minor' ? 260 : 0);
+    el.style.transition = 'none';
+    if (e.kind==='minor'){
+      el.style.opacity = '0'; el.getBoundingClientRect();
+      el.style.transition = `opacity .6s ease ${delay}ms`; el.style.opacity = '';
+      setTimeout(()=>{ el.style.transition = ''; }, delay+700);
+    } else {
+      const L = el.getTotalLength();
+      el.style.strokeDasharray = `${L}`; el.style.strokeDashoffset = `${L}`; el.getBoundingClientRect();
+      el.style.transition = `stroke-dashoffset .75s cubic-bezier(.4,0,.2,1) ${delay}ms`; el.style.strokeDashoffset = '0';
+      setTimeout(()=>{ el.style.transition = ''; el.style.strokeDasharray = ''; el.style.strokeDashoffset = ''; }, delay+850);
+    }
+  });
+}
+let timers = [];
+const later = (fn, ms) => { timers.push(setTimeout(fn, ms)); };
+function clearDots(){ timers.forEach(clearTimeout); timers = []; if (dotLayer) dotLayer.textContent = ''; }
+function travel(g, path, dur, done){
+  const L = path.getTotalLength(), t0 = performance.now();
+  const step = now => {
+    if (!g.isConnected) return;
+    const k = Math.min(1, (now-t0)/dur), e = k<.5 ? 2*k*k : 1-Math.pow(-2*k+2,2)/2;
+    const p = path.getPointAtLength(L*e);
+    g.setAttribute('transform', `translate(${p.x.toFixed(1)} ${p.y.toFixed(1)})`);
+    if (k<1) requestAnimationFrame(step); else done();
+  };
+  requestAnimationFrame(step);
+}
+function pulse(n){ if (!n) return; n.classList.remove('arrive'); void n.offsetWidth; n.classList.add('arrive'); }
+function ripple(n, x, y){
+  if (!n || REDUCE) return;
+  const s = document.createElement('span'); s.className = 'ripple';
+  s.style.left = `${x - n.offsetLeft}px`; s.style.top = `${y - n.offsetTop}px`;
+  n.appendChild(s); s.addEventListener('animationend', ()=>s.remove());
+  pulse(n);
+}
+function runDot(laneId, delay, toId){
+  if (REDUCE) return;
+  later(()=>{
+    const ein = EDGES.find(e=>e.lane===laneId && e.kind==='in');
+    const eout = EDGES.find(e=>e.lane===laneId && (toId ? e.to===toId : e.kind==='out'));
+    if (!ein || !eout) return;
+    const g = document.createElementNS(SVGNS,'g');
+    const halo = document.createElementNS(SVGNS,'circle'); halo.setAttribute('r','10'); halo.setAttribute('class','halo');
+    const dot = document.createElementNS(SVGNS,'circle'); dot.setAttribute('r','4.5'); dot.setAttribute('class','dot');
+    g.append(halo, dot); dotLayer.appendChild(g);
+    travel(g, ein.el, 420, ()=>{
+      pulse($(`.node.judge[data-lane="${laneId}"]`));
+      travel(g, eout.el, Math.max(560, eout.el.getTotalLength()*2), ()=>{
+        g.remove();
+        const end = eout.el.getPointAtLength(eout.el.getTotalLength());
+        ripple($(`.node.result[data-result="${eout.to}"]`), end.x, end.y);
+      });
+    });
+  }, delay);
+}
+
+/* ---------- selection ---------- */
+let SEL = null, loop = null;
+function keepTabVisible(b){
+  const c = $('#steps'), l = b.offsetLeft, r = l + b.offsetWidth;
+  if (l < c.scrollLeft) c.scrollLeft = l - 8; else if (r > c.scrollLeft + c.clientWidth) c.scrollLeft = r - c.clientWidth + 8;
+}
+function reveal(){
+  const m = $('#mapGrid'), r = m.getBoundingClientRect();
+  if (r.top > innerHeight*0.55 || r.bottom < 120) m.scrollIntoView({behavior: REDUCE?'auto':'smooth', block:'start'});
+}
+function select(sel, opts={}){
+  if (sel && SEL && opts.toggle && sel.type===SEL.type && sel.id===SEL.id) sel = null;
+  SEL = sel;
+  let lanes = [], results = [];
+  if (sel){
+    if (sel.type==='principle'){ const p = PRINCIPLES.find(x=>x.id===sel.id); lanes = p.lanes.slice(); results = p.res.slice(); }
+    else if (sel.type==='result'){ results = [sel.id]; lanes = LANES.filter(l=>l.to===sel.id || l.minor.includes(sel.id)).map(l=>l.id); }
+    else if (sel.id==='verify'){ lanes = LANES.map(l=>l.id); results = RESULTS.map(r=>r.id); }
+    else lanes = [sel.id];
+    if (sel.type!=='result') lanes.forEach(id=>{ const l = laneById(id); results.push(l.to, ...l.minor); });
+  }
+  $('#diagram').classList.toggle('has-sel', !!sel);
+  $$('#diagram .node').forEach(n=>{
+    const on = n.dataset.lane ? lanes.includes(n.dataset.lane) : results.includes(n.dataset.result);
+    n.classList.toggle('on', !!sel && on);
+  });
+  EDGES.forEach(e=>{
+    let on = lanes.includes(e.lane);
+    if (on && sel && sel.type==='result' && e.kind!=='in') on = e.to===sel.id;
+    e.el.classList.toggle('on', !!sel && on);
+  });
+  $$('.pcard').forEach(b=>b.setAttribute('aria-pressed', String(!!sel && sel.type==='principle' && b.dataset.p===sel.id)));
+  const active = sel && sel.type==='step' ? sel.id : null;
+  $$('.step').forEach((b,i)=>{
+    const on = b.dataset.step===active;
+    b.setAttribute('aria-selected', String(on));
+    b.tabIndex = (active ? on : i===0) ? 0 : -1;
+    if (on) keepTabVisible(b);
+  });
+  renderEvidence(sel);
+  clearDots(); clearInterval(loop);
+  if (sel && !REDUCE){
+    if (lanes.length){
+      const toId = sel.type==='result' ? sel.id : null;
+      const run = () => lanes.forEach((id,i)=>runDot(id, i*220, toId));
+      run(); loop = setInterval(run, 3600);
+    } else {
+      results.forEach((id,i)=>later(()=>{ const n = $(`.node.result[data-result="${id}"]`); if (n) ripple(n, n.offsetLeft+18, n.offsetTop+n.offsetHeight/2); }, i*220));
+    }
+  }
+  if (opts.reveal) reveal();
+}
+
+/* ---------- events ---------- */
+document.addEventListener('click', e=>{
+  const pc = e.target.closest('.pcard'); if (pc){ select({type:'principle', id:pc.dataset.p}, {toggle:true, reveal:true}); return; }
+  const st = e.target.closest('.step'); if (st){ select({type:'step', id:st.dataset.step}); return; }
+  const go = e.target.closest('[data-goto]'); if (go){ select({type:'step', id:go.dataset.goto}, {reveal: !!go.closest('.hcard')}); return; }
+  const nd = e.target.closest('#diagram .node');
+  if (nd){ if (nd.dataset.lane) select({type:'step', id:nd.dataset.lane}, {toggle:true}); else select({type:'result', id:nd.dataset.result}, {toggle:true}); return; }
+  if (e.target.closest('#clearSel')) select(null);
+});
+$('#steps').addEventListener('keydown', e=>{
+  const tabs = $$('.step'), i = tabs.indexOf(document.activeElement);
+  if (i<0) return;
+  let j = null;
+  if (e.key==='ArrowRight' || e.key==='ArrowDown') j = (i+1) % tabs.length;
+  else if (e.key==='ArrowLeft' || e.key==='ArrowUp') j = (i-1+tabs.length) % tabs.length;
+  else if (e.key==='Home') j = 0;
+  else if (e.key==='End') j = tabs.length-1;
+  if (j!==null){ e.preventDefault(); tabs[j].focus(); select({type:'step', id:tabs[j].dataset.step}); }
+});
+document.addEventListener('keydown', e=>{
+  if (e.altKey || e.ctrlKey || e.metaKey) return;
+  const t = e.target, tag = (t.tagName||'').toLowerCase();
+  if (tag==='input' || tag==='textarea' || tag==='select' || t.isContentEditable) return;
+  if (/^[0-9]$/.test(e.key)){ const s = STEPS[e.key==='0' ? 9 : +e.key-1]; if (s){ e.preventDefault(); select({type:'step', id:s.id}); } }
+  else if (e.key==='Escape' && SEL) select(null);
+});
+
+/* ---------- start ---------- */
+renderPrinciples(); renderSteps(); renderDiagram(); renderCharts(); renderHolds(); renderChat(); renderEvidence(null);
+buildEdges(); layoutWires();
+if ('ResizeObserver' in window) new ResizeObserver(()=>layoutWires()).observe($('#diagram'));
+else window.addEventListener('resize', layoutWires);
+const fontsReady = document.fonts && document.fonts.ready ? Promise.race([document.fonts.ready, new Promise(r=>setTimeout(r,1500))]) : Promise.resolve();
+fontsReady.then(()=>{
+  layoutWires(); drawIn();
+  if (!SEL) LANES.forEach((l,i)=>runDot(l.id, 1850+i*260));
+});
+</script>
+
+</body></html>
