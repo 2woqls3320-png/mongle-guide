@@ -9,6 +9,11 @@
 <meta property="og:title" content="몽글이 판단 지도">
 <meta property="og:description" content="AI 여행 가이드 몽글이의 판단 과정을 보여 주는 시연 페이지">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-title" content="몽글이">
+<meta name="theme-color" content="#F3F4FA" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#14162A" media="(prefers-color-scheme: dark)">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=IBM+Plex+Sans+KR:wght@400;500;600&family=Jua&display=swap">
@@ -902,4 +907,7 @@ fontsReady.then(()=>{
 });
 </script>
 
+<script>
+if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
+</script>
 </body></html>

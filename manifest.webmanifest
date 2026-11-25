@@ -1,0 +1,17 @@
+{
+  "id": "/",
+  "name": "몽글이 판단 지도",
+  "short_name": "몽글이",
+  "description": "AI 여행 가이드 몽글이의 판단 과정을 보여 주는 시연 앱",
+  "lang": "ko",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#F3F4FA",
+  "theme_color": "#F3F4FA",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
